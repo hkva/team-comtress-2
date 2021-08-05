@@ -417,6 +417,7 @@ BEGIN_RECV_TABLE_NOBASE( CTFPlayerShared, DT_TFPlayerShared )
 
 	RecvPropInt( RECVINFO( m_nPlayerCondEx2 ) ),
 	RecvPropInt( RECVINFO( m_nPlayerCondEx3 ) ),
+	RecvPropInt( RECVINFO( m_nPlayerCondEx4 ) ),
 	RecvPropArray3( RECVINFO_ARRAY( m_nStreaks ), RecvPropInt( RECVINFO( m_nStreaks[0] ) ) ),
 	RecvPropInt( RECVINFO( m_unTauntSourceItemID_Low ) ),
 	RecvPropInt( RECVINFO( m_unTauntSourceItemID_High ) ),
@@ -459,6 +460,7 @@ BEGIN_PREDICTION_DATA_NO_BASE( CTFPlayerShared )
 	DEFINE_PRED_FIELD( m_nPlayerCondEx, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
 	DEFINE_PRED_FIELD( m_nPlayerCondEx2, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
 	DEFINE_PRED_FIELD( m_nPlayerCondEx3, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
+	DEFINE_PRED_FIELD( m_nPlayerCondEx4, FIELD_INTEGER, FTYPEDESC_INSENDTABLE ),
 //	DEFINE_PRED_FIELD( m_hDisguiseWeapon, FIELD_EHANDLE, FTYPEDESC_INSENDTABLE ),
 	DEFINE_FIELD( m_flDisguiseCompleteTime, FIELD_FLOAT ),
 	DEFINE_PRED_FIELD( m_bHasPasstimeBall, FIELD_BOOLEAN, FTYPEDESC_INSENDTABLE ),
@@ -584,6 +586,7 @@ BEGIN_SEND_TABLE_NOBASE( CTFPlayerShared, DT_TFPlayerShared )
 
 	SendPropInt( SENDINFO( m_nPlayerCondEx2 ), -1, SPROP_VARINT | SPROP_UNSIGNED ),
 	SendPropInt( SENDINFO( m_nPlayerCondEx3 ), -1, SPROP_VARINT | SPROP_UNSIGNED ),
+	SendPropInt( SENDINFO( m_nPlayerCondEx4 ), -1, SPROP_VARINT | SPROP_UNSIGNED ),
 
 	SendPropArray3( SENDINFO_ARRAY3( m_nStreaks ), SendPropInt( SENDINFO_ARRAY( m_nStreaks ) ) ),
 	SendPropInt( SENDINFO( m_unTauntSourceItemID_Low ), -1, SPROP_UNSIGNED ),
@@ -759,7 +762,7 @@ CTFPlayerShared::CTFPlayerShared()
 	// of m_nPlayerCond, m_nPlayerCondEx, m_nPlayerCondEx2, and m_nPlayerCondEx3 to get more bits.
 	// This pattern is as such to preserve replays.
 	// Don't forget to add an m_nOldCond* and m_nForceCond*
-	COMPILE_TIME_ASSERT( TF_COND_LAST < (32 + 32 + 32 + 32) );
+	COMPILE_TIME_ASSERT( TF_COND_LAST < (32 + 32 + 32 + 32 + 32) );
 
 	m_nPlayerState.Set( TF_STATE_WELCOME );
 	m_bJumping = false;
@@ -851,6 +854,7 @@ CTFPlayerShared::CTFPlayerShared()
 	m_nForceConditionsEx = 0;
 	m_nForceConditionsEx2 = 0;
 	m_nForceConditionsEx3 = 0;
+	m_nForceConditionsEx4 = 0;
 
 	m_flChargeEndTime = -1000;
 	m_flLastChargeTime = -1000;
@@ -987,9 +991,15 @@ template < typename tIntType >
 class CConditionVars
 {
 public:
-	CConditionVars( tIntType& nPlayerCond, tIntType& nPlayerCondEx, tIntType& nPlayerCondEx2, tIntType& nPlayerCondEx3, ETFCond eCond )
+	CConditionVars( tIntType& nPlayerCond, tIntType& nPlayerCondEx, tIntType& nPlayerCondEx2, tIntType& nPlayerCondEx3, tIntType& nPlayerCondEx4, ETFCond eCond )
 	{
-		if ( eCond >= 96 )
+		if (eCond >= 128)
+		{
+			Assert(eCond < 128 + 32);
+			m_pnCondVar = &nPlayerCondEx4;
+			m_nCondBit = eCond - 128;
+		}
+		else if ( eCond >= 96 )
 		{
 			Assert( eCond < 96 + 32 );
 			m_pnCondVar = &nPlayerCondEx3;
@@ -1060,7 +1070,7 @@ void CTFPlayerShared::AddCond( ETFCond eCond, float flDuration /* = PERMANENT_CO
 
 	// Which bitfield are we tracking this condition variable in? Which bit within
 	// that variable will we track it as?
-	CConditionVars<int> cPlayerCond( m_nPlayerCond.m_Value, m_nPlayerCondEx.m_Value, m_nPlayerCondEx2.m_Value, m_nPlayerCondEx3.m_Value, eCond );
+	CConditionVars<int> cPlayerCond( m_nPlayerCond.m_Value, m_nPlayerCondEx.m_Value, m_nPlayerCondEx2.m_Value, m_nPlayerCondEx3.m_Value, m_nPlayerCondEx4.m_Value, eCond );
 
 	// See if there is an object representation of the condition.
 	bool bAddedToExternalConditionList = m_ConditionList.Add( eCond, flDuration, m_pOuter, pProvider );
@@ -1102,7 +1112,7 @@ void CTFPlayerShared::RemoveCond( ETFCond eCond, bool ignore_duration )
 	if ( !InCond( eCond ) )
 		return;
 
-	CConditionVars<int> cPlayerCond( m_nPlayerCond.m_Value, m_nPlayerCondEx.m_Value, m_nPlayerCondEx2.m_Value, m_nPlayerCondEx3.m_Value, eCond );
+	CConditionVars<int> cPlayerCond( m_nPlayerCond.m_Value, m_nPlayerCondEx.m_Value, m_nPlayerCondEx2.m_Value, m_nPlayerCondEx3.m_Value, m_nPlayerCondEx4.m_Value, eCond );
 
 	// If this variable is handled by the condition list, abort before doing the
 	// work for the condition flags.
@@ -1145,7 +1155,7 @@ bool CTFPlayerShared::InCond( ETFCond eCond ) const
 	if ( eCond < 32 && m_ConditionList.InCond( eCond ) )
 		return true;
 
-	CConditionVars<const int> cPlayerCond( m_nPlayerCond.m_Value, m_nPlayerCondEx.m_Value, m_nPlayerCondEx2.m_Value, m_nPlayerCondEx3.m_Value, eCond );
+	CConditionVars<const int> cPlayerCond( m_nPlayerCond.m_Value, m_nPlayerCondEx.m_Value, m_nPlayerCondEx2.m_Value, m_nPlayerCondEx3.m_Value, m_nPlayerCondEx4.m_Value, eCond );
 	return (cPlayerCond.CondVar() & cPlayerCond.CondBit()) != 0;
 }
 
@@ -1159,7 +1169,7 @@ bool CTFPlayerShared::WasInCond( ETFCond eCond ) const
 	// assert. And this comment).
 	Assert( eCond >= 32 && eCond < TF_COND_LAST );
 
-	CConditionVars<const int> cPlayerCond( m_nOldConditions, m_nOldConditionsEx, m_nOldConditionsEx2, m_nOldConditionsEx3, eCond );
+	CConditionVars<const int> cPlayerCond( m_nOldConditions, m_nOldConditionsEx, m_nOldConditionsEx2, m_nOldConditionsEx3, m_nOldConditionsEx4, eCond );
 	return (cPlayerCond.CondVar() & cPlayerCond.CondBit()) != 0;
 }
 
@@ -1172,7 +1182,7 @@ void CTFPlayerShared::ForceRecondNextSync( ETFCond eCond )
 	// Please check if you hit the assert. (And then remove the assert. And this comment).
 	Assert(eCond >= 32 && eCond < TF_COND_LAST);
 
-	CConditionVars<int> playerCond( m_nForceConditions, m_nForceConditionsEx, m_nForceConditionsEx2, m_nForceConditionsEx3, eCond );
+	CConditionVars<int> playerCond( m_nForceConditions, m_nForceConditionsEx, m_nForceConditionsEx2, m_nForceConditionsEx3, m_nForceConditionsEx4, eCond );
 	playerCond.CondVar() |= playerCond.CondBit();
 }
 
@@ -1348,6 +1358,7 @@ void CTFPlayerShared::OnPreDataChanged( void )
 	m_nOldConditionsEx = m_nPlayerCondEx;
 	m_nOldConditionsEx2 = m_nPlayerCondEx2;
 	m_nOldConditionsEx3 = m_nPlayerCondEx3;
+	m_nOldConditionsEx4 = m_nPlayerCondEx4;
 	m_nOldDisguiseClass = GetDisguiseClass();
 	m_nOldDisguiseTeam = GetDisguiseTeam();
 	m_iOldMovementStunParity = m_iMovementStunParity;
@@ -1380,18 +1391,21 @@ void CTFPlayerShared::OnDataChanged( void )
 	SyncConditions( m_nOldConditionsEx, m_nPlayerCondEx, m_nForceConditionsEx, 32 );
 	SyncConditions( m_nOldConditionsEx2, m_nPlayerCondEx2, m_nForceConditionsEx2, 64 );
 	SyncConditions( m_nOldConditionsEx3, m_nPlayerCondEx3, m_nForceConditionsEx3, 96 );
+	SyncConditions( m_nOldConditionsEx4, m_nPlayerCondEx4, m_nForceConditionsEx4, 128 );
 
 	// Make sure these items are present
 	m_nPlayerCond		|= m_nForceConditions;
 	m_nPlayerCondEx		|= m_nForceConditionsEx;
 	m_nPlayerCondEx2	|= m_nForceConditionsEx2;
 	m_nPlayerCondEx3	|= m_nForceConditionsEx3;
+	m_nPlayerCondEx4	|= m_nForceConditionsEx4;
 
 	// Clear our force bits now that we've used them.
 	m_nForceConditions = 0;
 	m_nForceConditionsEx = 0;
 	m_nForceConditionsEx2 = 0;
 	m_nForceConditionsEx3 = 0;
+	m_nForceConditionsEx4 = 0;
 
 	if ( m_nOldDisguiseClass != GetDisguiseClass() || m_nOldDisguiseTeam != GetDisguiseTeam() )
 	{
@@ -1472,6 +1486,7 @@ void CTFPlayerShared::RemoveAllCond()
 	m_nPlayerCondEx = 0;
 	m_nPlayerCondEx2 = 0;
 	m_nPlayerCondEx3 = 0;
+	m_nPlayerCondEx4 = 0;
 }
 
 
@@ -9058,7 +9073,8 @@ void CTFPlayerShared::GetConditionsBits( CBitVec< TF_COND_LAST >& vbConditions )
 	vbConditions.Set( 1u, (uint32)m_nPlayerCondEx );
 	vbConditions.Set( 2u, (uint32)m_nPlayerCondEx2 );
 	vbConditions.Set( 3u, (uint32)m_nPlayerCondEx3 );
-	COMPILE_TIME_ASSERT( 32 + 32 + 32 + 32 > TF_COND_LAST );
+	vbConditions.Set( 4u, (uint32)m_nPlayerCondEx4 );
+	COMPILE_TIME_ASSERT( 32 + 32 + 32 + 32 + 32 > TF_COND_LAST );
 }
 
 //-----------------------------------------------------------------------------

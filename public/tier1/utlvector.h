@@ -650,7 +650,8 @@ inline CUtlVector<T, A>& CUtlVector<T, A>::operator=( const CUtlVector<T, A> &ot
 	return *this;
 }
 
-#ifdef STAGING_ONLY
+//#ifdef STAGING_ONLY
+#if 0
 inline void StagingUtlVectorBoundsCheck( int i, int size )
 {
 	if ( (unsigned)i >= (unsigned)size )

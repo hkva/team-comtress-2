@@ -918,6 +918,7 @@ private:
 	CNetworkVar( int, m_nPlayerCondEx );		// Player condition flags (extended -- we overflowed 32 bits).
 	CNetworkVar( int, m_nPlayerCondEx2 );		// Player condition flags (extended -- we overflowed 64 bits).
 	CNetworkVar( int, m_nPlayerCondEx3 );		// Player condition flags (extended -- we overflowed 96 bits).
+	CNetworkVar( int, m_nPlayerCondEx4 );		// Player condition flags (extended -- we overflowed 128 bits).
 
 	CNetworkVarEmbedded( CTFConditionList, m_ConditionList );
 
@@ -1047,6 +1048,7 @@ private:
 	int m_nOldConditionsEx;
 	int m_nOldConditionsEx2;
 	int m_nOldConditionsEx3;
+	int m_nOldConditionsEx4;
 	int	m_nOldDisguiseClass;
 	int	m_nOldDisguiseTeam;
 
@@ -1054,6 +1056,7 @@ private:
 	int m_nForceConditionsEx;
 	int m_nForceConditionsEx2;
 	int m_nForceConditionsEx3;
+	int m_nForceConditionsEx4;
 
 
 	// Feign Death
